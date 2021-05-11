@@ -286,5 +286,5 @@ if __name__ == '__main__':
     p1 = Process(target=mine, args=(a, BLOCKCHAIN))
     p1.start()
     # Start server to receive transactions
-    p2 = Process(target=node.run(port=5000), args=b)
+    p2 = Process(target=node.run(port=5002), args=b)
     p2.start()

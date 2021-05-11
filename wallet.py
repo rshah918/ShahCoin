@@ -24,7 +24,7 @@ import base64
 import ecdsa
 import json
 
-
+PEER_NODES = ["http://localhost:5002", "http://localhost:5001", "http://localhost:5000"]
 def wallet():
     response = None
     while response not in ["1", "2", "3"]:
@@ -68,16 +68,17 @@ def send_transaction(addr_from, private_key, addr_to, amount):
 
     if len(private_key) == 64:
         signature, message = sign_ECDSA_msg(private_key)
-        url = 'http://localhost:5001/txion'
         payload = {"from": addr_from,
                    "to": addr_to,
                    "amount": amount,
                    "signature": signature.decode(),
                    "message": message}
         headers = {"Content-Type": "application/json"}
-
-        res = requests.post(url, json=payload, headers=headers)
-        print(res.text)
+        #broadcast transaction to the network
+        for url in PEER_NODES:
+            res = requests.post(url+'/txion', json=payload, headers=headers)
+            if url == PEER_NODES[0]:
+                print(res.text)
     else:
         print("Wrong address or key length! Verify and try again.")
 
@@ -86,13 +87,18 @@ def view_blockchain():
     """Retrieve the entire blockchain. With this you can check your
     wallets balance. If the blockchain is to long, it may take some time to load.
     """
-    res = requests.get('http://localhost:5001/blocks')
+    max_blockchain_length = 0
+    blockchain = None
+    for url in PEER_NODES:
+        res = requests.get(url+'/blocks')
+        chain_length = len(json.loads(res.text))
+        if max_blockchain_length < chain_length:
+            max_blockchain_length = chain_length
+            blockchain = res.text
     print("-----------------------------------")
-    print("Blockchain Length: ", len(json.loads(res.text)))
+    print("Blockchain Length: ", max_blockchain_length)
     print("-----------------------------------")
-    print(res.text)
-
-
+    print(blockchain)
 def generate_ECDSA_keys():
     """This function takes care of creating your private and public (your address) keys.
     It's very important you don't lose any of them or those wallets will be lost

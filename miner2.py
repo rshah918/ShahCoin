@@ -64,6 +64,7 @@ def proof_of_work(last_proof, blockchain):
             new_blockchain = consensus(blockchain)
             if new_blockchain:
                 # (False: another node got proof first, new blockchain)
+                print("ANOTHER MINER WON")
                 return False, new_blockchain
     # Once that number is found, we can return it as a proof of our work
     return incrementer, blockchain
@@ -121,7 +122,6 @@ def mine(a, blockchain):
             mined_block = Block(new_block_index, new_block_timestamp, new_block_data, last_block_hash)
             #add block to blockchain
             BLOCKCHAIN.append(mined_block)
-            print("new blockchain length: ", len(BLOCKCHAIN))
             #Display the new block
             print(json.dumps({
               "index": new_block_index,
@@ -137,7 +137,7 @@ def find_new_chains():
     for node_url in PEER_NODES:
         # Get their chains using a GET request
         headers = headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.76 Safari/537.36'}
-        chain = requests.get(url = "http://localhost:5000/blocks", headers=headers).content
+        chain = requests.get(url = node_url + "/blocks", headers=headers).content
         # Convert each block in the blockchain from JSON to Python Dictionaries
         chain = json.loads(chain)
         #convert each block in the blockchain from dicts to Block objects
@@ -146,7 +146,6 @@ def find_new_chains():
             curr_block = Block(block["index"], block["timestamp"], block["data"], block["previous_hash"])
             curr_block.hash = block["hash"]
             reformatted_chain.append(curr_block)
-        print("Length of other chain: ", len(reformatted_chain))
         # Verify other node block is correct
         validated = validate_blockchain(reformatted_chain)
         if validated:
@@ -164,7 +163,7 @@ def consensus(blockchain):
     for chain in other_chains:
         if len(longest_chain) < len(chain):
             longest_chain = chain
-    # If the longest chain wasn't ours, then we set our chain to the longest
+    # If the longest chain wasn't theirs, then we set our chain to the longest
     if longest_chain == BLOCKCHAIN:
         # Keep searching for proof
         return False
@@ -199,6 +198,7 @@ def get_blocks():
         }
         chain_to_send_json.append(block)
     #convert blocks to json
+    print("Blockchain size: ", len(chain_to_send))
     chain_to_send = json.dumps(chain_to_send_json)
     return chain_to_send
 
