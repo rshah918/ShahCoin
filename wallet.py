@@ -31,7 +31,7 @@ def wallet():
         response = input("""What do you want to do?
         1. Generate new wallet
         2. Send coins to another wallet
-        3. Check transactions\n""")
+        3. View Blockchain\n""")
     if response == "1":
         # Generate new wallet
         print("""=========================================\n
@@ -50,7 +50,7 @@ IMPORTANT: save this credentials or you won't be able to recover your wallet\n
         if response.lower() == "y":
             send_transaction(addr_from, private_key, addr_to, amount)
     else:  # Will always occur when response == 3.
-        check_transactions()
+        view_blockchain()
 
 
 def send_transaction(addr_from, private_key, addr_to, amount):
@@ -68,7 +68,7 @@ def send_transaction(addr_from, private_key, addr_to, amount):
 
     if len(private_key) == 64:
         signature, message = sign_ECDSA_msg(private_key)
-        url = 'http://localhost:5000/txion'
+        url = 'http://localhost:5001/txion'
         payload = {"from": addr_from,
                    "to": addr_to,
                    "amount": amount,
@@ -82,11 +82,11 @@ def send_transaction(addr_from, private_key, addr_to, amount):
         print("Wrong address or key length! Verify and try again.")
 
 
-def check_transactions():
+def view_blockchain():
     """Retrieve the entire blockchain. With this you can check your
     wallets balance. If the blockchain is to long, it may take some time to load.
     """
-    res = requests.get('http://localhost:5000/blocks')
+    res = requests.get('http://localhost:5001/blocks')
     print("-----------------------------------")
     print("Blockchain Length: ", len(json.loads(res.text)))
     print("-----------------------------------")
@@ -130,9 +130,19 @@ def sign_ECDSA_msg(private_key):
 
 
 if __name__ == '__main__':
-    print("""       =========================================\n
-        SHAH COIN v1 - BLOCKCHAIN SYSTEM\n
-       =========================================\n\n
+    print("""=================================================================================\n
+.oooooo..o oooo                  oooo          .oooooo.              o8o
+d8P'    `Y8 `888                  `888         d8P'  `Y8b             `"'
+Y88bo.       888 .oo.    .oooo.    888 .oo.   888           .ooooo.  oooo  ooo. .oo.
+ `"Y8888o.   888P"Y88b  `P  )88b   888P"Y88b  888          d88' `88b `888  `888P"Y88b
+     `"Y88b  888   888   .oP"888   888   888  888          888   888  888   888   888
+oo     .d8P  888   888  d8(  888   888   888  `88b    ooo  888   888  888   888   888
+8""88888P'  o888o o888o `Y888""8o o888o o888o  `Y8bood8P'  `Y8bod8P' o888o o888o o888o
+
+
+
+ v1 - BLOCKCHAIN SYSTEM\n
+===================================================================================\n\n
 """)
     wallet()
     input("Press ENTER to exit...")

@@ -6,11 +6,12 @@ import base64
 from flask import Flask, request
 from multiprocessing import Process, Pipe
 import ecdsa
+from flask_cors import CORS
 
-from miner_config import MINER_ADDRESS, MINER_NODE_URL, PEER_NODES
+from miner1_config import MINER_ADDRESS, MINER_NODE_URL, PEER_NODES
 
 node = Flask(__name__)
-
+CORS(node)
 class Block:
     def __init__(self, index, timestamp, data, previous_hash):
         """Returns a new Block object. Each block is "chained" to its previous
@@ -73,21 +74,24 @@ def mine(a, blockchain):
     In order to prevent too many coins to be created, the process
     is slowed down by the proof of work algorithm.
     """
+    BLOCKCHAIN = blockchain
     while True:
         # Load all pending transactions sent to the node server
-        BLOCKCHAIN = blockchain
+
         NODE_PENDING_TRANSACTIONS = a.recv()
         #Check pipe buffer for a request for the entire blockchain by the parent thread
         if NODE_PENDING_TRANSACTIONS == "get_blockchain":
             a.send(BLOCKCHAIN)
             continue
 
-        # Get the previous block's proof of work
+        '''# Get the previous block's proof of work
         last_block = BLOCKCHAIN[-1]
         last_proof = last_block.data['proof-of-work']
         # Calculate the proof of work for the current block being mined
         #Program will hang here until the correct proof of work is found
-        proof = proof_of_work(last_proof, BLOCKCHAIN)
+        proof = proof_of_work(last_proof, BLOCKCHAIN)'''
+        #get the proof of work from the parent process
+        proof, BLOCKCHAIN = a.recv()
         # If another node found the proof_of_work before us, start mining again
         if not proof[0]:
             # Update blockchain and save it to file
@@ -97,6 +101,8 @@ def mine(a, blockchain):
         else:
             # Once we find a valid proof of work, we know we can mine a block so
             # Add a transaction that rewards the miner with some coins
+            last_block = BLOCKCHAIN[-1]
+            last_proof = last_block.data['proof-of-work']
             NODE_PENDING_TRANSACTIONS.append({
                 "from": "network",
                 "to": MINER_ADDRESS,
@@ -130,14 +136,22 @@ def find_new_chains():
     other_chains = []
     for node_url in PEER_NODES:
         # Get their chains using a GET request
-        block = requests.get(url = node_url + "/blocks").content
-        # Convert the JSON object to a Python dictionary
-        block = json.loads(block)
+        headers = headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.76 Safari/537.36'}
+        chain = requests.get(url = "http://localhost:5000/blocks", headers=headers).content
+        # Convert each block in the blockchain from JSON to Python Dictionaries
+        chain = json.loads(chain)
+        #convert each block in the blockchain from dicts to Block objects
+        reformatted_chain = []
+        for block in chain:
+            curr_block = Block(block["index"], block["timestamp"], block["data"], block["previous_hash"])
+            curr_block.hash = block["hash"]
+            reformatted_chain.append(curr_block)
+        print("Length of other chain: ", len(reformatted_chain))
         # Verify other node block is correct
-        validated = validate_blockchain(block)
+        validated = validate_blockchain(reformatted_chain)
         if validated:
             # Add it to our list
-            other_chains.append(block)
+            other_chains.append(reformatted_chain)
     return other_chains
 
 
@@ -177,9 +191,10 @@ def get_blocks():
     chain_to_send_json = []
     for block in chain_to_send:
         block = {
-            "index": str(block.index),
-            "timestamp": str(block.timestamp),
-            "data": str(block.data),
+            "index": block.index,
+            "timestamp": block.timestamp,
+            "data": block.data,
+            "previous_hash": block.previous_hash,
             "hash": block.hash
         }
         chain_to_send_json.append(block)
@@ -206,7 +221,21 @@ def transaction():
             print("TO: {0}".format(new_txion['to']))
             print("AMOUNT: {0}\n".format(new_txion['amount']))
             # Then we let the client know it worked out
+            """
+            Have the Parent process retreive other node's blockchains, verify them, and choose the longest one.
+            Then, pipe the correct blockchain back down to the child
+            """
+            # Request the full blockchain from the child process
+            b.send("get_blockchain")
+            BLOCKCHAIN = b.recv()
+            # Get the previous block's proof of work
+            last_block = BLOCKCHAIN[-1]
+            last_proof = last_block.data['proof-of-work']
+            #calculate the proof-of-work
+            proof = proof_of_work(last_proof, BLOCKCHAIN)
+            #send pending transactions and proof of work
             b.send(NODE_PENDING_TRANSACTIONS)
+            b.send([proof, BLOCKCHAIN])
             return "Transaction submission successful\n"
         else:
             return "Transaction submission failed. Wrong signature\n"
@@ -234,12 +263,20 @@ def validate_signature(public_key, signature, message):
 
 
 def welcome_msg():
-    print("""       =========================================\n
-        SIMPLE COIN v1.0.0 - BLOCKCHAIN SYSTEM\n
-       =========================================\n\n
-        You can find more help at: https://github.com/cosme12/SimpleCoin\n
-        Make sure you are using the latest version or you may end in
-        a parallel chain.\n\n\n""")
+    print("""=================================================================================\n
+.oooooo..o oooo                  oooo          .oooooo.              o8o
+d8P'    `Y8 `888                  `888         d8P'  `Y8b             `"'
+Y88bo.       888 .oo.    .oooo.    888 .oo.   888           .ooooo.  oooo  ooo. .oo.
+ `"Y8888o.   888P"Y88b  `P  )88b   888P"Y88b  888          d88' `88b `888  `888P"Y88b
+     `"Y88b  888   888   .oP"888   888   888  888          888   888  888   888   888
+oo     .d8P  888   888  d8(  888   888   888  `88b    ooo  888   888  888   888   888
+8""88888P'  o888o o888o `Y888""8o o888o o888o  `Y8bood8P'  `Y8bod8P' o888o o888o o888o
+
+
+
+ v1 - BLOCKCHAIN SYSTEM\n
+===================================================================================\n\n
+""")
 
 
 if __name__ == '__main__':
@@ -249,5 +286,5 @@ if __name__ == '__main__':
     p1 = Process(target=mine, args=(a, BLOCKCHAIN))
     p1.start()
     # Start server to receive transactions
-    p2 = Process(target=node.run(port=5000), args=b)
+    p2 = Process(target=node.run(port=5001), args=b)
     p2.start()
