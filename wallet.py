@@ -60,11 +60,6 @@ def send_transaction(addr_from, private_key, addr_to, amount):
     having a longer chain. So make sure your transaction is deep into the chain
     before claiming it as approved!
     """
-    #For fast debugging REMOVE LATER
-    private_key="9b02a80c0a7a0773a2f13e355867ccfd99f609610e66c6ada87c08b76878f5ea"
-    amount="3000"
-    addr_from="WC1Z3SKJyZDyuHHemTENPJRwHF66K07PobksDg6x51Ej5DcuEPueBoQOODhAnkaQ3JuXtDjXybLhFffSlgx42A=="
-    addr_to="FNyTxLATyboflAcbcSwKzOIno/26/tMS8Ga1oMr3vMd5ijW3RrU1Sqb8WJUp+JgwJkXtaVvil0qfQ9eX2sT1Ng=="
 
     if len(private_key) == 64:
         signature, message = sign_ECDSA_msg(private_key)
@@ -76,9 +71,12 @@ def send_transaction(addr_from, private_key, addr_to, amount):
         headers = {"Content-Type": "application/json"}
         #broadcast transaction to the network
         for url in PEER_NODES:
-            res = requests.post(url+'/txion', json=payload, headers=headers)
-            if url == PEER_NODES[0]:
-                print(res.text)
+            try:
+                res = requests.post(url+'/txion', json=payload, headers=headers, timeout=10)
+                if url == PEER_NODES[0]:
+                    print(res.text)
+            except:
+                pass
     else:
         print("Wrong address or key length! Verify and try again.")
 
@@ -90,11 +88,14 @@ def view_blockchain():
     max_blockchain_length = 0
     blockchain = None
     for url in PEER_NODES:
-        res = requests.get(url+'/blocks')
-        chain_length = len(json.loads(res.text))
-        if max_blockchain_length < chain_length:
-            max_blockchain_length = chain_length
-            blockchain = res.text
+        try:
+            res = requests.get(url+'/blocks', timeout=10)
+            chain_length = len(json.loads(res.text))
+            if max_blockchain_length < chain_length:
+                max_blockchain_length = chain_length
+                blockchain = res.text
+        except:
+            pass
     print("-----------------------------------")
     print("Blockchain Length: ", max_blockchain_length)
     print("-----------------------------------")

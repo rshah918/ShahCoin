@@ -6,12 +6,9 @@ import base64
 from flask import Flask, request
 from multiprocessing import Process, Pipe
 import ecdsa
-from flask_cors import CORS
-
 from miner1_config import MINER_ADDRESS, MINER_NODE_URL, PEER_NODES
 
 node = Flask(__name__)
-CORS(node)
 class Block:
     def __init__(self, index, timestamp, data, previous_hash):
         """Returns a new Block object. Each block is "chained" to its previous
@@ -85,13 +82,8 @@ def mine(a, blockchain):
             a.send(BLOCKCHAIN)
             continue
 
-        '''# Get the previous block's proof of work
-        last_block = BLOCKCHAIN[-1]
-        last_proof = last_block.data['proof-of-work']
-        # Calculate the proof of work for the current block being mined
+        # Calculate the proof of work for the current block being mined from the parent process
         #Program will hang here until the correct proof of work is found
-        proof = proof_of_work(last_proof, BLOCKCHAIN)'''
-        #get the proof of work from the parent process
         proof, BLOCKCHAIN = a.recv()
         # If another node found the proof_of_work before us, start mining again
         if not proof[0]:
@@ -173,9 +165,8 @@ def consensus(blockchain):
         return BLOCKCHAIN
 
 
-def validate_blockchain(block):
-    """Validate the submitted chain. If hashes are not correct, return false
-    block(str): json
+def validate_blockchain(blockchain):
+    """Iterate through each block, verify the hashes and transactions
     """
     return True
 
@@ -212,8 +203,9 @@ def transaction():
     if request.method == 'POST':
         # On each new POST request, we extract the transaction data
         new_txion = request.get_json()
-        # Add transaction to the pending transaction list
+        # Verify transaction
         if validate_signature(new_txion['from'], new_txion['signature'], new_txion['message']):
+            #Add transaction to the pending transaction list
             NODE_PENDING_TRANSACTIONS.append(new_txion)
             # Because the transaction was successfully submitted, log it to the console
             print("New transaction")
@@ -245,7 +237,6 @@ def transaction():
         # Empty transaction list
         NODE_PENDING_TRANSACTIONS[:] = []
         return pending
-
 
 def validate_signature(public_key, signature, message):
     """Verifies if the signature is correct. This is used to prove

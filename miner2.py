@@ -6,12 +6,9 @@ import base64
 from flask import Flask, request
 from multiprocessing import Process, Pipe
 import ecdsa
-from flask_cors import CORS
-
 from miner1_config import MINER_ADDRESS, MINER_NODE_URL, PEER_NODES
 
 node = Flask(__name__)
-CORS(node)
 class Block:
     def __init__(self, index, timestamp, data, previous_hash):
         """Returns a new Block object. Each block is "chained" to its previous
